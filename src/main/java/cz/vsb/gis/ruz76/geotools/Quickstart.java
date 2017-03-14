@@ -10,7 +10,7 @@ public class Quickstart {
         m.addLayer("data/routes.shp");
         //m.printStates_Routes();
         //m.printStates_States();
-        m.printStates_States(10, 0.05);
+        m.printStates_States(10, 0.05); //0.05 is experimental - you can specify another buffer tolerance
         //m.show();
     }
 
