@@ -1,8 +1,6 @@
 package cz.vsb.gis.ruz76.geotools;
 
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.MultiPolygon;
-import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.*;
 import org.geotools.data.DataUtilities;
 import org.geotools.data.FileDataStore;
 import org.geotools.data.FileDataStoreFinder;
@@ -10,6 +8,7 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.factory.CommonFactoryFinder;
+import org.geotools.geometry.jts.FactoryFinder;
 import org.geotools.map.FeatureLayer;
 import org.geotools.map.Layer;
 import org.geotools.map.MapContent;
@@ -21,9 +20,11 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.filter.Filter;
 import org.opengis.filter.FilterFactory2;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * Created by ruz76 on 24.11.2016.
@@ -119,10 +120,12 @@ public class Map {
         SimpleFeatureCollection routes_fc = DataUtilities.collection(routes.getFeatures());
 
         SimpleFeatureIterator states_sfi = states_fc.features();
+        //Loop to all states
         while (states_sfi.hasNext()) {
             SimpleFeature state = states_sfi.next();
             MultiPolygon p = (MultiPolygon) state.getDefaultGeometry();
             //System.out.println(p.getArea());
+            //Gets only polygons under limited area
             if (p.getArea() < arealimit) {
 
                 System.out.println("---- " + state.getAttribute("STATE_NAME") + " ----");
@@ -130,27 +133,114 @@ public class Map {
 
                 Filter filter = ff.touches(ff.property("the_geom"), ff.literal(state.getDefaultGeometry()));
                 SimpleFeatureIterator states_nei_sfi = states_fc.subCollection(filter).features();
+                //Loops states that surrounds processed state
+
                 while (states_nei_sfi.hasNext()) {
                     SimpleFeature state_nei = states_nei_sfi.next();
                     System.out.println(state_nei.getAttribute("STATE_NAME"));
 
+                    //Creates intersection between buffer around processed state and processed surounding state
                     Geometry state_nei_buffer = ((MultiPolygon) state_nei.getDefaultGeometry()).buffer(distance);
                     Geometry buffer_intersection = state_nei_buffer.intersection(state_buffer);
 
                     Filter filterroutes = ff.intersects(ff.property("the_geom"), ff.literal(buffer_intersection));
                     SimpleFeatureIterator routes_sfi = routes_fc.subCollection(filterroutes).features();
                     //System.out.println("Routes between surrounding state and state");
+                    //Loops routes that are in intersections between two states
                     while (routes_sfi.hasNext()) {
                         SimpleFeature route = routes_sfi.next();
                         Geometry route_intersection = buffer_intersection.intersection((Geometry) route.getDefaultGeometry());
                         //System.out.println(route_intersection);
                         //System.out.println(buffer_intersection);
+                        //If the perimeter of the intersection of states is up to 10 times bigger than route that is in intersection
+                        //then the route is probably along the whole intersection
+                        //difficult to determine limit, but 10 seems to be good
+                        //will do some tests on real data later
                         if ((buffer_intersection.getLength() / route_intersection.getLength()) < 10) { //10 is Experimental
                             System.out.println("Probably route along shared border between " + state.getAttribute("STATE_NAME") + " and " + state_nei.getAttribute("STATE_NAME"));
                         }
                         System.out.println("Route id: " + route.getAttribute("id") + " Length: " + route_intersection.getLength() + " From: " + buffer_intersection.getLength());
                     }
                 }
+            }
+        }
+    }
+
+
+    /*
+    * Finds routes that are along shared border of state that is under area limit and surrounding state
+    * */
+    public void printStates_States(double arealimit, double distance, AreaRange arearange, BufferedWriter bw) throws Exception {
+        FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2();
+
+        FileDataStore states_store = FileDataStoreFinder.getDataStore(new File("data/states.shp"));
+        SimpleFeatureSource states = states_store.getFeatureSource();
+        FileDataStore routes_store = FileDataStoreFinder.getDataStore(new File("data/routes.shp"));
+        SimpleFeatureSource routes = routes_store.getFeatureSource();
+
+        SimpleFeatureCollection states_fc = DataUtilities.collection(states.getFeatures());
+        SimpleFeatureCollection routes_fc = DataUtilities.collection(routes.getFeatures());
+
+        SimpleFeatureIterator states_sfi = states_fc.features();
+        //Loop to all states
+        while (states_sfi.hasNext()) {
+            SimpleFeature state = states_sfi.next();
+            MultiPolygon p = (MultiPolygon) state.getDefaultGeometry();
+            //System.out.println(p.getArea());
+            //Gets only polygons under limited area
+            if (p.getArea() < arealimit) {
+
+                System.out.println("---- " + state.getAttribute("STATE_NAME") + " ----");
+                Geometry state_buffer = ((MultiPolygon) state.getDefaultGeometry()).buffer(distance);
+
+                Filter filter = ff.touches(ff.property("the_geom"), ff.literal(state.getDefaultGeometry()));
+                SimpleFeatureIterator states_nei_sfi = states_fc.subCollection(filter).features();
+                bw.write("S;" + state.getDefaultGeometry() + "\n");
+
+                Geometry geomout = (Geometry) state.getDefaultGeometry();
+                //Loops states that surrounds processed state
+                while (states_nei_sfi.hasNext()) {
+                    SimpleFeature state_nei = states_nei_sfi.next();
+                    System.out.println(state_nei.getAttribute("STATE_NAME"));
+
+                    //Creates intersection between buffer around processed state and processed surounding state
+                    Geometry state_nei_buffer = ((MultiPolygon) state_nei.getDefaultGeometry()).buffer(distance);
+                    Geometry buffer_intersection = state_nei_buffer.intersection(state_buffer);
+
+                    Filter filterroutes = ff.intersects(ff.property("the_geom"), ff.literal(buffer_intersection));
+                    SimpleFeatureIterator routes_sfi = routes_fc.subCollection(filterroutes).features();
+                    //System.out.println("Routes between surrounding state and state");
+                    //Loops routes that are in intersections between two states
+                    boolean isRoute = false;
+                    while (routes_sfi.hasNext()) {
+                        SimpleFeature route = routes_sfi.next();
+                        Geometry route_intersection = buffer_intersection.intersection((Geometry) route.getDefaultGeometry());
+                        //System.out.println(route_intersection);
+                        //System.out.println(buffer_intersection);
+                        //If the perimeter of the intersection of states is up to 10 times bigger than route that is in intersection
+                        //then the route is probably along the whole intersection
+                        //difficult to determine limit, but 10 seems to be good
+                        //will do some tests on real data later
+                        if ((buffer_intersection.getLength() / route_intersection.getLength()) < 10) { //10 is Experimental
+                            System.out.println("Probably route along shared border between " + state.getAttribute("STATE_NAME") + " and " + state_nei.getAttribute("STATE_NAME"));
+                            isRoute = true;
+                        }
+                        System.out.println("Route id: " + route.getAttribute("id") + " Length: " + route_intersection.getLength() + " From: " + buffer_intersection.getLength());
+                    }
+                    if (!isRoute) {
+                        GeometryFactory factory = new GeometryFactory();
+                        ArrayList c = new ArrayList();
+                        c.add(state_nei.getDefaultGeometry());
+                        c.add(state.getDefaultGeometry());
+                        GeometryCollection gc = (GeometryCollection) factory.buildGeometry(c);
+                        Geometry union = gc.union();
+                        if (arearange.getFit(union.getArea()) > arearange.getFit(geomout.getArea())) {
+                            geomout = union;
+                        }
+                    }
+                }
+                //System.out.println(gc.union());
+                bw.write("U;" + geomout + "\n");
             }
         }
     }
