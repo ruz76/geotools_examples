@@ -25,6 +25,7 @@ import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Created by jencek on 28.3.17.
@@ -45,8 +46,10 @@ public class Tools {
         SimpleFeatureCollection routes_fc = DataUtilities.collection(routes.getFeatures());
 
         ListFeatureCollection states_fc_list = new ListFeatureCollection(states_fc);
+        ListFeatureCollection states_fc_list2 = new ListFeatureCollection(states_fc);
 
-        SimpleFeatureIterator states_sfi = states_fc.features();
+        SimpleFeatureIterator states_sfi = states_fc_list2.features();
+        ArrayList<String> modified_states = new ArrayList();
 
         //List<SimpleFeature> featuresout = new ArrayList<>();
 
@@ -57,7 +60,7 @@ public class Tools {
             MultiPolygon p = (MultiPolygon) state.getDefaultGeometry();
             //System.out.println(p.getArea());
             //Gets only polygons under limited area
-            if (p.getArea() < arealimit) {
+            if (p.getArea() < arealimit && !modified_states.contains(state.getAttribute("STATE_FIPS").toString())) {
 
                 System.out.println("---- " + state.getAttribute("STATE_NAME") + " ----");
                 Geometry state_buffer = ((MultiPolygon) state.getDefaultGeometry()).buffer(distance);
@@ -114,6 +117,8 @@ public class Tools {
                 bw.write("U;" + geomout + "\n");
                 states_fc_list.remove(state);
                 states_fc_list.remove(state_to_remove);
+                //states_fc_list2.remove(state_to_remove);
+                modified_states.add(state_to_remove.getAttribute("STATE_FIPS").toString());
                 //states_fc_list.removeIf(state_to_remove.getID() == siteID)
                 /*
                 Filter filterstateid = ff.equal( ff.property( "STATE_FIPS"), ff.literal( state.getAttribute("STATE_FIPS").toString() ) );
@@ -127,12 +132,12 @@ public class Tools {
                 state.setDefaultGeometry(geomout);
                 states_fc_list.add(state);
                 //Only for debug purposes
-                saveFeatureCollectionToShapefile("/tmp/test.shp", states_fc_list, states_fc_list.getSchema());
-                System.out.println("End Feature");
+                //saveFeatureCollectionToShapefile("/tmp/test.shp", states_fc_list, states_fc_list.getSchema());
+                //System.out.println("End Feature");
             }
             //featuresout.add(state);
         }
-        //saveFeatureCollectionToShapefile("/tmp/test.shp", states_fc_list, states_fc_list.getSchema());
+        saveFeatureCollectionToShapefile("/tmp/test.shp", states_fc_list, states_fc_list.getSchema());
         System.out.println("End");
     }
 
