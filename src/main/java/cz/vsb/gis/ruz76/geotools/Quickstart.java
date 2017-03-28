@@ -7,17 +7,18 @@ import java.io.IOException;
 public class Quickstart {
 
     public static void main(String[] args) throws Exception {
-        Map m = new Map();
+        Mapa m = new Mapa();
         //m.addLayer("D:\\ruz76\\geoserver-2.9.1\\data_dir\\data\\shapefiles\\states.shp");
         //m.addLayer("D:\\ruz76\\geoserver-2.9.1\\data_dir\\data\\shapefiles\\routes.shp");
-        m.addLayer("data/states.shp");
-        m.addLayer("data/routes.shp");
+        //m.addLayer("data/states.shp");
+        //m.addLayer("data/routes.shp");
         //m.printStates_Routes();
         //m.printStates_States();
         //m.printStates_States(10, 0.05); //0.05 is experimental - you can specify another buffer tolerance
         //m.show();
+        Tools t = new Tools();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("/tmp/union.wkt"))) {
-            m.printStates_States(10, 0.05, new AreaRange(20, 40), bw); //0.05 is experimental - you can specify another buffer tolerance
+            t.printStates_States(10, 0.05, new AreaRange(20, 10000), bw); //0.05 is experimental - you can specify another buffer tolerance
         } catch (IOException e) {
             e.printStackTrace();
         }
